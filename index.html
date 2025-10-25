@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whisky Flavor Map - Interactive Guide</title>
+    <meta name="description" content="Interactive whisky flavor map with 200+ bottles plotted by oakiness and fruit intensity">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { margin: 0; padding: 0; }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin {
+        animation: spin 1s linear infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+        
+        // Lucide icons as inline SVG components
+        const Info = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        );
+        
+        const Search = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+        );
+        
+        const X = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        );
+        
+        const Loader = ({ size = 24, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <line x1="12" y1="2" x2="12" y2="6"></line>
+                <line x1="12" y1="18" x2="12" y2="22"></line>
+                <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                <line x1="2" y1="12" x2="6" y2="12"></line>
+                <line x1="18" y1="12" x2="22" y2="12"></line>
+                <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+            </svg>
+        );
+
+        const WhiskyFlavorMap = () => {
+          const [hoveredBottle, setHoveredBottle] = useState(null);
+          const [searchInput, setSearchInput] = useState('');
+          const [isSearching, setIsSearching] = useState(false);
+          const [userWhisky, setUserWhisky] = useState(null);
+          const [searchMessage, setSearchMessage] = useState('');
+          
+          const whiskies = [
+            { name: "Weller Special Reserve", x: 1, y: 7, proof: 90, category: "wheated" },
+            { name: "Weller Antique 107", x: 1.5, y: 7.5, proof: 107, category: "wheated" },
+            { name: "Weller 12 Year", x: 3, y: 8.5, proof: 90, category: "wheated" },
+            { name: "Weller Full Proof", x: 2, y: 8, proof: 114, category: "wheated" },
+            { name: "Weller CYPB", x: 2.5, y: 8, proof: 95, category: "wheated" },
+            { name: "Old Rip Van Winkle 10yr", x: 2, y: 9, proof: 107, category: "wheated" },
+            { name: "Van Winkle Lot B 12yr", x: 3, y: 8.5, proof: 90.4, category: "wheated" },
+            { name: "Pappy 15yr", x: 3.5, y: 8.5, proof: 107, category: "wheated" },
+            { name: "Pappy 20yr", x: 4, y: 8, proof: 90.4, category: "wheated" },
+            { name: "Pappy 23yr", x: 5, y: 7.5, proof: 95.6, category: "wheated" },
+            { name: "Old Fitzgerald 7yr BiB", x: 2, y: 8, proof: 100, category: "wheated" },
+            { name: "Old Fitzgerald 13yr", x: 3.5, y: 8, proof: 100, category: "wheated" },
+            { name: "Castle & Key Wheated", x: 1.5, y: 7.5, proof: 100, category: "wheated" },
+            { name: "Larceny Small Batch", x: 0.5, y: 6, proof: 92, category: "wheated" },
+            { name: "Larceny Barrel Proof", x: 1.5, y: 7, proof: 124, category: "wheated" },
+            { name: "Maker's Mark", x: 1, y: 6.5, proof: 90, category: "wheated" },
+            { name: "Maker's 46 CS", x: 1.5, y: 7, proof: 110, category: "wheated" },
+            { name: "Maker's Cellar Aged", x: 2, y: 7.5, proof: 114, category: "wheated" },
+            { name: "Maker's The Heart", x: 1, y: 6.5, proof: 111.7, category: "wheated" },
+            { name: "Willett 8yr Wheated", x: 2.5, y: 9, proof: 108, category: "wheated" },
+            { name: "Star Hill Farm Wheat", x: 2, y: 7.5, proof: 114.7, category: "wheated" },
+            { name: "Four Roses Small Batch", x: 4, y: 8, proof: 90, category: "four-roses" },
+            { name: "Four Roses LE Small Batch", x: 5.5, y: 9, proof: 107, category: "four-roses" },
+            { name: "Four Roses OESK", x: 4.5, y: 9, proof: 110, category: "four-roses" },
+            { name: "Four Roses OESO", x: 5, y: 9, proof: 110, category: "four-roses" },
+            { name: "Four Roses OBSF", x: 5, y: 8.5, proof: 110, category: "four-roses" },
+            { name: "Four Roses OBSK", x: 5, y: 8.5, proof: 116, category: "four-roses" },
+            { name: "Four Roses OBSO", x: 5, y: 8, proof: 110, category: "four-roses" },
+            { name: "Four Roses OBSQ", x: 5.5, y: 8.5, proof: 110, category: "four-roses" },
+            { name: "Four Roses OBSV", x: 5, y: 8.5, proof: 110, category: "four-roses" },
+            { name: "Four Roses OESV", x: 5, y: 9, proof: 110, category: "four-roses" },
+            { name: "Blanton's Original", x: 4, y: 7, proof: 93, category: "buffalo-trace" },
+            { name: "Blanton's Gold", x: 4.5, y: 7.5, proof: 103, category: "buffalo-trace" },
+            { name: "Blanton's SFTB", x: 5, y: 8, proof: 126.7, category: "buffalo-trace" },
+            { name: "Eagle Rare 10yr", x: 3.5, y: 7, proof: 90, category: "buffalo-trace" },
+            { name: "Eagle Rare 12yr", x: 4, y: 7.5, proof: 95, category: "buffalo-trace" },
+            { name: "Eagle Rare 17yr", x: 6, y: 7.5, proof: 101, category: "buffalo-trace" },
+            { name: "Rock Hill Farms", x: 4, y: 7, proof: 100, category: "buffalo-trace" },
+            { name: "Elmer T Lee", x: 3.5, y: 6.5, proof: 90, category: "buffalo-trace" },
+            { name: "Hancock's Reserve", x: 4, y: 6.5, proof: 88.9, category: "buffalo-trace" },
+            { name: "Michter's 10yr Bourbon", x: 6.5, y: 8, proof: 94.4, category: "premium" },
+            { name: "Michter's 10yr Rye", x: 7, y: 8.5, proof: 93, category: "premium" },
+            { name: "Michter's 20yr Bourbon", x: 8, y: 7.5, proof: 114, category: "premium" },
+            { name: "Baker's 13yr", x: 7, y: 7.5, proof: 107, category: "beam" },
+            { name: "Knob Creek 18yr", x: 7.5, y: 7, proof: 100, category: "beam" },
+            { name: "Knob Creek 21yr", x: 8.5, y: 6.5, proof: 100, category: "beam" },
+            { name: "Buffalo Trace", x: 2, y: 5, proof: 90, category: "buffalo-trace" },
+            { name: "Benchmark", x: 1.5, y: 4.5, proof: 80, category: "buffalo-trace" },
+            { name: "EH Taylor Small Batch", x: 2.5, y: 5.5, proof: 100, category: "buffalo-trace" },
+            { name: "EH Taylor Single Barrel", x: 3, y: 6, proof: 100, category: "buffalo-trace" },
+            { name: "EH Taylor Barrel Proof", x: 3.5, y: 6.5, proof: 130, category: "buffalo-trace" },
+            { name: "EH Taylor Rye", x: 3.5, y: 6, proof: 100, category: "buffalo-trace" },
+            { name: "Bulleit Bourbon", x: 2, y: 4.5, proof: 90, category: "other" },
+            { name: "Woodford Reserve", x: 2.5, y: 5, proof: 90.4, category: "other" },
+            { name: "Woodford Double Oaked", x: 4, y: 5.5, proof: 90.4, category: "other" },
+            { name: "Early Times BiB", x: 2, y: 4.5, proof: 100, category: "other" },
+            { name: "Old Forester 100", x: 3.5, y: 5, proof: 100, category: "old-forester" },
+            { name: "Old Forester 1897 BiB", x: 3.5, y: 5.5, proof: 100, category: "old-forester" },
+            { name: "Old Forester 1910", x: 3, y: 5, proof: 93, category: "old-forester" },
+            { name: "Old Forester 1920", x: 3.5, y: 5.5, proof: 115, category: "old-forester" },
+            { name: "Old Forester Statesman", x: 2.5, y: 4.5, proof: 95, category: "old-forester" },
+            { name: "Old Forester King Ranch", x: 4.5, y: 5.5, proof: 105, category: "old-forester" },
+            { name: "Old Forester President's Choice", x: 5, y: 6, proof: 115, category: "old-forester" },
+            { name: "Old Forester Birthday", x: 5.5, y: 6.5, proof: 97, category: "old-forester" },
+            { name: "Old Forester Barrel Strength SiB", x: 5.5, y: 6.5, proof: 125, category: "old-forester" },
+            { name: "Knob Creek 9yr", x: 4.5, y: 5, proof: 100, category: "beam" },
+            { name: "Knob Creek 12yr", x: 5, y: 5.5, proof: 100, category: "beam" },
+            { name: "Old Grand Dad BiB", x: 4, y: 5, proof: 100, category: "beam" },
+            { name: "Old Grand Dad 114", x: 4.5, y: 5.5, proof: 114, category: "beam" },
+            { name: "Willett Pot Still", x: 3, y: 5.5, proof: 94, category: "willett" },
+            { name: "Willett 4yr Rye", x: 5, y: 6.5, proof: 110, category: "willett" },
+            { name: "Wild Turkey 101", x: 4, y: 5, proof: 101, category: "wild-turkey" },
+            { name: "Russell's Reserve 10yr", x: 5, y: 5.5, proof: 90, category: "wild-turkey" },
+            { name: "Russell's Reserve 13yr", x: 5.5, y: 6, proof: 114.8, category: "wild-turkey" },
+            { name: "Russell's Reserve 15yr", x: 6, y: 6, proof: 117, category: "wild-turkey" },
+            { name: "WT Master's Keep Beacon", x: 5.5, y: 6, proof: 118, category: "wild-turkey" },
+            { name: "WT Jimmy Russell 70th", x: 5, y: 5.5, proof: 101, category: "wild-turkey" },
+            { name: "Rowan's Creek", x: 4, y: 5, proof: 100.1, category: "willett" },
+            { name: "Noah's Mill", x: 5, y: 5.5, proof: 114.3, category: "willett" },
+            { name: "Johnny Drum", x: 4, y: 5, proof: 101, category: "willett" },
+            { name: "Calumet 16yr", x: 7.5, y: 5, proof: 106, category: "barton" },
+            { name: "Calumet 18yr", x: 8.5, y: 4.5, proof: 118, category: "barton" },
+            { name: "Lazy K Bar 8yr", x: 6, y: 6.5, proof: 92, category: "barton" },
+            { name: "Evan Williams 12yr", x: 6.5, y: 5.5, proof: 86.6, category: "heaven-hill" },
+            { name: "Evan Williams 23yr", x: 8, y: 5, proof: 107, category: "heaven-hill" },
+            { name: "Evan Williams BiB", x: 4, y: 5, proof: 100, category: "heaven-hill" },
+            { name: "Henry McKenna 10yr BiB", x: 6, y: 5.5, proof: 100, category: "heaven-hill" },
+            { name: "Elijah Craig Barrel Proof", x: 6, y: 6, proof: 130, category: "heaven-hill" },
+            { name: "Elijah Craig 18yr", x: 7.5, y: 6, proof: 90, category: "heaven-hill" },
+            { name: "Elijah Craig Toasted Barrel", x: 5.5, y: 6, proof: 94, category: "heaven-hill" },
+            { name: "Elijah Craig Toasted Rye", x: 6, y: 6.5, proof: 94, category: "heaven-hill" },
+            { name: "Heaven Hill 7yr BiB", x: 6, y: 5, proof: 100, category: "heaven-hill" },
+            { name: "Heaven Hill Grain to Glass", x: 5.5, y: 5.5, proof: 107, category: "heaven-hill" },
+            { name: "Old Ezra 7yr 101", x: 5.5, y: 5, proof: 101, category: "heaven-hill" },
+            { name: "Pikesville Rye", x: 6, y: 6.5, proof: 110, category: "heaven-hill" },
+            { name: "I.W. Harper 15yr", x: 7, y: 4.5, proof: 86, category: "heaven-hill" },
+            { name: "Old Overholt 11yr CS", x: 7, y: 6.5, proof: 114, category: "beam" },
+            { name: "Old Grand Dad 16yr", x: 7, y: 4, proof: 100, category: "beam" },
+            { name: "Blade & Bow", x: 6, y: 5, proof: 91, category: "other" },
+            { name: "Blade & Bow 22yr", x: 8, y: 5, proof: 92, category: "other" },
+            { name: "Very Old St Nick", x: 7.5, y: 5.5, proof: 118.1, category: "other" },
+            { name: "Belle Meade", x: 5.5, y: 5.5, proof: 90.4, category: "other" },
+            { name: "George T Stagg", x: 5, y: 4.5, proof: 135, category: "buffalo-trace" },
+            { name: "Stagg Jr", x: 5, y: 4.5, proof: 130, category: "buffalo-trace" },
+            { name: "Thomas H Handy", x: 6, y: 5, proof: 130, category: "buffalo-trace" },
+            { name: "William Larue Weller", x: 4, y: 6, proof: 128, category: "buffalo-trace" },
+            { name: "A. Smith Bowman CS", x: 5, y: 5, proof: 135, category: "other" },
+            { name: "A. Overholt Rye", x: 5, y: 5, proof: 80, category: "other" },
+            { name: "Bomberger's Declaration", x: 6, y: 5.5, proof: 108, category: "premium" },
+            { name: "Michter's Toasted Barrel", x: 6, y: 6, proof: 107, category: "premium" },
+            { name: "Michter's US1 Bourbon", x: 4.5, y: 5.5, proof: 91.4, category: "premium" },
+            { name: "New Riff 8yr Bourbon", x: 5, y: 5.5, proof: 100, category: "other" },
+            { name: "Found North Hell Diver 17yr", x: 7.5, y: 3.5, proof: 112.4, category: "canadian" },
+            { name: "Found North Hover Hawk 15yr", x: 7, y: 3.5, proof: 123.2, category: "canadian" },
+            { name: "Orphan Barrel Barterhouse 20yr", x: 8, y: 3.5, proof: 90, category: "orphan" },
+            { name: "Orphan Barrel Fable & Folly 14yr", x: 7.5, y: 3.5, proof: 90, category: "orphan" },
+            { name: "Orphan Barrel Forged Oak 15yr", x: 7.5, y: 3, proof: 90, category: "orphan" },
+            { name: "Orphan Barrel Lost Prophet 22yr", x: 8.5, y: 3, proof: 90, category: "orphan" },
+            { name: "Orphan Barrel Rhetoric 25yr", x: 9, y: 2.5, proof: 90, category: "orphan" },
+            { name: "Jack Daniel's 10yr", x: 6, y: 4, proof: 97, category: "tennessee" },
+            { name: "Jack Daniel's 12yr", x: 6.5, y: 3.5, proof: 107, category: "tennessee" },
+            { name: "Jack Daniel's 14yr BP", x: 7, y: 3.5, proof: 131, category: "tennessee" },
+            { name: "Jack Daniel's BiB", x: 5, y: 4.5, proof: 100, category: "tennessee" },
+            { name: "George Dickel BiB", x: 5.5, y: 4.5, proof: 100, category: "tennessee" },
+            { name: "George Dickel 8yr", x: 5, y: 4, proof: 80, category: "tennessee" },
+            { name: "Angel's Envy Port", x: 3, y: 7, proof: 86.6, category: "finished" },
+            { name: "Angel's Envy Triple Oak", x: 4, y: 6.5, proof: 100, category: "finished" },
+            { name: "Isaac Bowman Port", x: 3, y: 6.5, proof: 92, category: "finished" },
+            { name: "Barrell Gold Label", x: 6, y: 6, proof: 115, category: "blend" },
+            { name: "Bardstown Discovery", x: 5.5, y: 6.5, proof: 115, category: "blend" },
+            { name: "Bardstown Origin High Wheat", x: 2.5, y: 7, proof: 96, category: "bardstown" },
+            { name: "Bardstown Cathedral French Oak", x: 5, y: 6.5, proof: 118, category: "bardstown" },
+            { name: "Ben Holladay BiB", x: 4, y: 5.5, proof: 100, category: "other" },
+            { name: "Bluegrass Blue Corn BiB", x: 4, y: 5.5, proof: 100, category: "other" },
+            { name: "Bib and Tucker", x: 5, y: 5.5, proof: 92, category: "other" },
+            { name: "1792 Full Proof", x: 5, y: 5.5, proof: 125, category: "barton" },
+            { name: "13th Colony Double Oaked", x: 5, y: 6, proof: 100, category: "other" },
+            { name: "Chattanooga BiB", x: 4.5, y: 5.5, proof: 100, category: "other" },
+            { name: "Chicken Cock", x: 4.5, y: 5, proof: 100, category: "other" },
+            { name: "Coopers Craft 100", x: 3.5, y: 5, proof: 100, category: "other" },
+            { name: "Cream of Kentucky", x: 6, y: 5.5, proof: 106.4, category: "other" },
+            { name: "Dream Spirits 8yr CS", x: 6, y: 5.5, proof: 120, category: "other" },
+            { name: "Frey Ranch", x: 4, y: 5.5, proof: 90, category: "other" },
+            { name: "Garrison Brothers", x: 4.5, y: 5, proof: 94, category: "texas" },
+            { name: "Green River Full Proof", x: 4.5, y: 5.5, proof: 114, category: "other" },
+            { name: "Hardin's Creek Clermont", x: 5.5, y: 6, proof: 108, category: "beam" },
+            { name: "Hardin's Creek Frankfort", x: 5.5, y: 6, proof: 106, category: "beam" },
+            { name: "High West Midwinter's Dram", x: 5, y: 7, proof: 98.6, category: "blend" },
+            { name: "High West American Prairie", x: 4, y: 6, proof: 92, category: "blend" },
+            { name: "James E Pepper 1776", x: 4.5, y: 5, proof: 100, category: "other" },
+            { name: "James E Pepper Decanter", x: 5, y: 5.5, proof: 105.4, category: "other" },
+            { name: "Jefferson's Oceans", x: 4, y: 6, proof: 90, category: "other" },
+            { name: "John J Bowman SiB", x: 4.5, y: 6, proof: 100, category: "other" },
+            { name: "Joseph Magnus Cigar Blend", x: 6, y: 6, proof: 104, category: "blend" },
+            { name: "Kentucky Owl Rye", x: 6.5, y: 7.5, proof: 110, category: "premium" },
+            { name: "King of Kentucky", x: 6.5, y: 6.5, proof: 127, category: "premium" },
+            { name: "Peerless Double Oak", x: 5.5, y: 6, proof: 107, category: "other" },
+            { name: "Peerless Small Batch", x: 4.5, y: 5.5, proof: 107, category: "other" },
+            { name: "Penelope Barrel Strength", x: 5, y: 6, proof: 116, category: "other" },
+            { name: "Penelope Toasted", x: 4.5, y: 6, proof: 96, category: "other" },
+            { name: "Pursuit United", x: 5.5, y: 6, proof: 115, category: "blend" },
+            { name: "Rare Character Limited Ed", x: 6, y: 6.5, proof: 110, category: "blend" },
+            { name: "Shenk's Homestead", x: 6, y: 6, proof: 91.2, category: "premium" },
+            { name: "Smoke Wagon", x: 5, y: 5.5, proof: 100, category: "other" },
+            { name: "Smokeye Hill BP", x: 6, y: 6, proof: 120, category: "other" },
+            { name: "Smooth Ambler Contradiction", x: 5, y: 5.5, proof: 100, category: "other" },
+            { name: "Uncle Nearest 1884", x: 4.5, y: 5.5, proof: 93, category: "tennessee" },
+            { name: "Wilderness Trail BiB", x: 4, y: 5.5, proof: 100, category: "other" },
+          ];
+
+          const categories = {
+            "wheated": { color: "#ef4444", label: "Wheated" },
+            "buffalo-trace": { color: "#3b82f6", label: "Buffalo Trace" },
+            "willett": { color: "#8b5cf6", label: "Willett" },
+            "old-forester": { color: "#f59e0b", label: "Old Forester" },
+            "beam": { color: "#10b981", label: "Beam Family" },
+            "four-roses": { color: "#ec4899", label: "Four Roses" },
+            "premium": { color: "#14b8a6", label: "Premium/Luxury" },
+            "barton": { color: "#f97316", label: "Barton" },
+            "wild-turkey": { color: "#84cc16", label: "Wild Turkey" },
+            "heaven-hill": { color: "#6366f1", label: "Heaven Hill" },
+            "canadian": { color: "#a855f7", label: "Canadian" },
+            "orphan": { color: "#78716c", label: "Orphan Barrel" },
+            "tennessee": { color: "#dc2626", label: "Tennessee" },
+            "finished": { color: "#06b6d4", label: "Finished Whisky" },
+            "blend": { color: "#a3e635", label: "Blended/Batched" },
+            "bardstown": { color: "#fbbf24", label: "Bardstown BBC" },
+            "texas": { color: "#fb923c", label: "Texas" },
+            "other": { color: "#64748b", label: "Other" },
+            "user-search": { color: "#fbbf24", label: "Your Search" }
+          };
+
+          const [selectedCategories, setSelectedCategories] = useState(Object.keys(categories).filter(c => c !== 'user-search'));
+
+          const toggleCategory = (cat) => {
+            if (cat === 'user-search') return;
+            setSelectedCategories(prev => 
+              prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+            );
+          };
+
+          const getQuadrant = (x, y) => {
+            if (y >= 6.5 && x <= 3.5) return "Fruity Wheaters";
+            if (y >= 6.5 && x > 3.5 && x <= 6.5) return "Fruity & Complex";
+            if (y >= 6.5 && x > 6.5) return "Fruity with Heavy Oak";
+            if (y < 6.5 && y >= 4.5 && x <= 3.5) return "Light & Traditional";
+            if (y < 6.5 && y >= 4.5 && x > 3.5 && x <= 6.5) return "Classic Traditional Whisky";
+            if (y < 6.5 && y >= 4.5 && x > 6.5) return "Oak Dominant Aged";
+            if (y < 4.5 && x <= 6.5) return "Power/Spice Forward";
+            return "Very Oak Forward";
+          };
+
+          const findNearestWhiskies = (x, y) => {
+            const distances = whiskies.map(b => ({
+              ...b,
+              distance: Math.sqrt(Math.pow(b.x - x, 2) + Math.pow(b.y - y, 2))
+            }));
+            distances.sort((a, b) => a.distance - b.distance);
+            return distances.slice(0, 3);
+          };
+
+          const handleSearch = async () => {
+            if (!searchInput.trim()) return;
+            
+            setIsSearching(true);
+            setSearchMessage('');
+            
+            try {
+              // Call our Netlify Function
+              const response = await fetch('/.netlify/functions/analyze-whisky', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  whiskyName: searchInput
+                })
+              });
+
+              if (!response.ok) {
+                throw new Error('Analysis failed');
+              }
+
+              const analysis = await response.json();
+              
+              const newWhisky = {
+                name: searchInput,
+                x: analysis.oakiness,
+                y: analysis.fruitIntensity,
+                proof: "Unknown",
+                category: "user-search",
+                keyNotes: analysis.keyNotes
+              };
+              
+              setUserWhisky(newWhisky);
+              
+              const nearest = findNearestWhiskies(analysis.oakiness, analysis.fruitIntensity);
+              const quadrant = getQuadrant(analysis.oakiness, analysis.fruitIntensity);
+              
+              setSearchMessage(
+                `Based on reviews, ${searchInput} has ${analysis.oakiness.toFixed(1)} oakiness and ${analysis.fruitIntensity.toFixed(1)} fruit intensity, positioning it in the "${quadrant}" region near ${nearest.map(b => b.name).join(", ")}.`
+              );
+              
+            } catch (error) {
+              console.error('Search error:', error);
+              setSearchMessage(`Unable to analyze ${searchInput}. This might be a rare or misspelled whisky. Try searching for reviews online first!`);
+            } finally {
+              setIsSearching(false);
+            }
+          };
+
+          const handleClear = () => {
+            setUserWhisky(null);
+            setSearchMessage('');
+            setSearchInput('');
+          };
+
+          const filteredWhiskies = whiskies.filter(b => selectedCategories.includes(b.category));
+          const allDisplayWhiskies = userWhisky ? [...filteredWhiskies, userWhisky] : filteredWhiskies;
+
+          return (
+            <div className="w-full min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 p-6">
+              <div className="max-w-7xl mx-auto">
+                <div className="mb-6">
+                  <h1 className="text-3xl font-bold text-amber-900 mb-2">
+                    Comprehensive Whisky Flavor Map
+                  </h1>
+                  <p className="text-amber-700 flex items-center gap-2 text-sm">
+                    <Info size={16} />
+                    Based on reviews from Bourbon Culture & Breaking Bourbon - Fruit intensity (vertical) vs Oakiness (horizontal)
+                  </p>
+                </div>
+
+                <div className="mb-6 bg-white rounded-lg shadow-lg p-4">
+                  <h3 className="text-sm font-semibold mb-3 text-amber-900">Search Any Whisky:</h3>
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                      <input
+                        type="text"
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                        placeholder="Enter any whisky name (e.g., Buffalo Trace, Redwood Empire)"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        disabled={isSearching}
+                      />
+                    </div>
+                    <button
+                      onClick={handleSearch}
+                      disabled={isSearching || !searchInput.trim()}
+                      className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {isSearching ? (
+                        <>
+                          <Loader size={18} className="animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        'Search'
+                      )}
+                    </button>
+                    {userWhisky && (
+                      <button
+                        onClick={handleClear}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
+                      >
+                        <X size={18} />
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  {searchMessage && (
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+                      {searchMessage}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-6 bg-white rounded-lg shadow-lg p-4">
+                  <h3 className="text-sm font-semibold mb-3 text-amber-900">Filter by Category:</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(categories).filter(([key]) => key !== 'user-search').map(([key, {color, label}]) => (
+                      <button
+                        key={key}
+                        onClick={() => toggleCategory(key)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          selectedCategories.includes(key)
+                            ? 'opacity-100 shadow-md'
+                            : 'opacity-30'
+                        }`}
+                        style={{
+                          backgroundColor: color,
+                          color: 'white'
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-2xl p-8 relative">
+                  <svg viewBox="0 0 1000 1000" className="w-full" style={{ minHeight: '700px' }}>
+                    <defs>
+                      <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+                        <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#f0f0f0" strokeWidth="1"/>
+                      </pattern>
+                    </defs>
+                    <rect width="1000" height="1000" fill="url(#grid)" />
+                    
+                    <line x1="100" y1="900" x2="900" y2="900" stroke="#94a3b8" strokeWidth="3" />
+                    <line x1="100" y1="900" x2="100" y2="100" stroke="#94a3b8" strokeWidth="3" />
+                    
+                    <line x1="500" y1="100" x2="500" y2="900" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="10,5" />
+                    <line x1="100" y1="500" x2="900" y2="500" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="10,5" />
+                    
+                    <text x="500" y="970" textAnchor="middle" className="text-sm font-semibold fill-amber-800">
+                      Oakiness →
+                    </text>
+                    <text x="30" y="500" textAnchor="middle" transform="rotate(-90 30 500)" className="text-sm font-semibold fill-amber-800">
+                      ← Fruit Intensity
+                    </text>
+                    
+                    <text x="300" y="250" textAnchor="middle" className="text-xs font-medium fill-amber-600 opacity-40">
+                      Fruity Wheaters
+                    </text>
+                    <text x="700" y="250" textAnchor="middle" className="text-xs font-medium fill-amber-600 opacity-40">
+                      Fruity & Complex
+                    </text>
+                    <text x="300" y="750" textAnchor="middle" className="text-xs font-medium fill-amber-600 opacity-40">
+                      Light & Traditional
+                    </text>
+                    <text x="700" y="750" textAnchor="middle" className="text-xs font-medium fill-amber-600 opacity-40">
+                      Oak Dominant
+                    </text>
+                    
+                    {[0, 2.5, 5, 7.5, 10].map(val => {
+                      const x = 100 + (val * 80);
+                      const y = 900 - (val * 80);
+                      return (
+                        <g key={`scale-${val}`}>
+                          <text x={x} y="930" textAnchor="middle" className="text-xs fill-gray-500">
+                            {val}
+                          </text>
+                          <text x="70" y={y + 5} textAnchor="end" className="text-xs fill-gray-500">
+                            {val}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    
+                    {(() => {
+                      const positionMap = new Map();
+                      allDisplayWhiskies.forEach((whisky, idx) => {
+                        const baseX = 100 + (whisky.x * 80);
+                        const baseY = 900 - (whisky.y * 80);
+                        const key = `${Math.round(baseX)},${Math.round(baseY)}`;
+                        
+                        if (!positionMap.has(key)) {
+                          positionMap.set(key, []);
+                        }
+                        positionMap.get(key).push({ whisky, idx, baseX, baseY });
+                      });
+                      
+                      const adjustedPositions = [];
+                      positionMap.forEach((bottles) => {
+                        if (bottles.length === 1) {
+                          adjustedPositions.push({
+                            ...bottles[0],
+                            x: bottles[0].baseX,
+                            y: bottles[0].baseY
+                          });
+                        } else {
+                          const radius = 8;
+                          bottles.forEach((bottle, i) => {
+                            const angle = (2 * Math.PI * i) / bottles.length;
+                            adjustedPositions.push({
+                              ...bottle,
+                              x: bottle.baseX + Math.cos(angle) * radius,
+                              y: bottle.baseY + Math.sin(angle) * radius
+                            });
+                          });
+                        }
+                      });
+                      
+                      return adjustedPositions.map(({ whisky, idx, x, y }) => {
+                        const isHovered = hoveredBottle === idx;
+                        const isUserSearch = whisky.category === 'user-search';
+                        
+                        return (
+                          <g key={idx}>
+                            {isUserSearch && (
+                              <>
+                                <circle
+                                  cx={x}
+                                  cy={y}
+                                  r="15"
+                                  fill="none"
+                                  stroke="#fbbf24"
+                                  strokeWidth="2"
+                                  opacity="0.5"
+                                  className="animate-pulse"
+                                />
+                                <circle
+                                  cx={x}
+                                  cy={y}
+                                  r="20"
+                                  fill="none"
+                                  stroke="#fbbf24"
+                                  strokeWidth="1"
+                                  opacity="0.3"
+                                  className="animate-pulse"
+                                />
+                              </>
+                            )}
+                            <circle
+                              cx={x}
+                              cy={y}
+                              r={isUserSearch ? 10 : (isHovered ? 8 : 5)}
+                              fill={categories[whisky.category].color}
+                              opacity={isHovered || isUserSearch ? 1 : 0.7}
+                              stroke="white"
+                              strokeWidth={isUserSearch ? 4 : (isHovered ? 3 : 2)}
+                              className="cursor-pointer transition-all"
+                              onMouseEnter={() => setHoveredBottle(idx)}
+                              onMouseLeave={() => setHoveredBottle(null)}
+                            />
+                            {(isHovered || isUserSearch) && (
+                              <g>
+                                <rect
+                                  x={x + 15}
+                                  y={y - 35}
+                                  width="220"
+                                  height="50"
+                                  fill="white"
+                                  stroke={categories[whisky.category].color}
+                                  strokeWidth="2"
+                                  rx="6"
+                                  className="drop-shadow-lg"
+                                />
+                                <text
+                                  x={x + 25}
+                                  y={y - 15}
+                                  className="text-xs font-bold"
+                                  fill="#1f2937"
+                                >
+                                  {whisky.name} {isUserSearch ? "★" : ""}
+                                </text>
+                                <text
+                                  x={x + 25}
+                                  y={y - 2}
+                                  className="text-xs"
+                                  fill="#6b7280"
+                                >
+                                  {whisky.proof} proof | {categories[whisky.category].label}
+                                </text>
+                              </g>
+                            )}
+                          </g>
+                        );
+                      });
+                    })()}
+                  </svg>
+                </div>
+
+                <div className="mt-6 bg-amber-100 rounded-lg shadow p-6">
+                  <h3 className="text-lg font-bold text-amber-900 mb-3">Key Flavor Profile Insights</h3>
+                  <div className="space-y-2 text-sm text-amber-800">
+                    <p>• <strong>High Fruit, Low Oak Zone (Top Left):</strong> Wheated whiskies dominate - Weller, Pappy, Maker's, Old Fitz. Sweet, approachable, cotton candy notes.</p>
+                    <p>• <strong>High Fruit, Moderate Oak (Top Center):</strong> Four Roses recipes excel here with "fruit bomb" profiles. Blanton's and younger Eagle Rare also cluster here.</p>
+                    <p>• <strong>High Fruit, High Oak (Top Right):</strong> Premium aged expressions - Michter's 10yr/20yr, Baker's 13yr, Knob Creek 18yr/21yr maintain fruit despite heavy oak.</p>
+                    <p>• <strong>Moderate Fruit, Low-Moderate Oak (Center):</strong> Traditional whisky sweet spot - Old Forester, Knob Creek, Wild Turkey, standard Buffalo Trace lineup.</p>
+                    <p>• <strong>Low Fruit, Moderate Oak (Bottom Center):</strong> Power whiskies - George T. Stagg, Stagg Jr., William Larue Weller, Thomas Handy. Spice and oak dominate.</p>
+                    <p>• <strong>Low Fruit, High Oak (Bottom Right):</strong> Over-oaked or very aged - Orphan Barrel series, Found North Canadians, Jack Daniel's aged releases, Calumet 16-18yr.</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-white rounded-lg shadow p-4">
+                  <p className="text-xs text-gray-600 text-center">
+                    Flavor profiles based on tasting notes from <strong>Bourbon Culture</strong> (thebourbonculture.com) and <strong>Breaking Bourbon</strong> (breakingbourbon.com)
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<WhiskyFlavorMap />, document.getElementById('root'));
+    </script>
+</body>
+</html>
